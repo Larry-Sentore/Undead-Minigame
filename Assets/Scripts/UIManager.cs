@@ -20,7 +20,6 @@ public sealed class UIManager : MonoBehaviour
     // Subscribes to gameplay events and renders the initial HUD. Design pattern: Observer subscription.
     private void OnEnable()
     {
-        Enemy.OnEnemyKilled += HandleEnemyKilled;
         PlayerController.OnHealthChanged += HandleHealthChanged;
         GameManager.OnStatsChanged += RefreshStats;
         GameManager.OnGameOver += HandleGameOver;
@@ -54,7 +53,6 @@ public sealed class UIManager : MonoBehaviour
     // Removes event subscriptions when the HUD is disabled. Design pattern: Observer cleanup.
     private void OnDisable()
     {
-        Enemy.OnEnemyKilled -= HandleEnemyKilled;
         PlayerController.OnHealthChanged -= HandleHealthChanged;
         GameManager.OnStatsChanged -= RefreshStats;
         GameManager.OnGameOver -= HandleGameOver;
@@ -82,12 +80,6 @@ public sealed class UIManager : MonoBehaviour
             int totalSeconds = Mathf.FloorToInt(manager.SurvivalTime);
             survivalTimeText.text = string.Format("Time: {0:00}:{1:00}", totalSeconds / 60, totalSeconds % 60);
         }
-    }
-
-    // Refreshes run labels after an enemy defeat. Design pattern: Observer event handler.
-    private void HandleEnemyKilled(Enemy enemy)
-    {
-        RefreshStats();
     }
 
     // Shows the player's latest health. Design pattern: Observer event handler.

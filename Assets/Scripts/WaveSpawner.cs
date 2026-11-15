@@ -1,8 +1,9 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Spawns increasingly large enemy groups and tracks living enemies. OOP principle: composition with a generic registry.
+/// Spawns increasingly large enemy groups and tracks living enemies.
 /// </summary>
 public sealed class WaveSpawner : MonoBehaviour
 {
@@ -13,12 +14,16 @@ public sealed class WaveSpawner : MonoBehaviour
     [SerializeField] private float timeBetweenWaves = 4f;
     [SerializeField] private float spawnRadius = 8f;
 
-    private readonly ObjectRegistry<Enemy> activeEnemies = new ObjectRegistry<Enemy>();
+    private readonly List<Enemy> activeEnemies = new List<Enemy>();
 
-    // Gets the registry used by auto-targeting. OOP principle: encapsulation with read-only access.
-    public ObjectRegistry<Enemy> ActiveEnemies
+    // Gets the living enemies used by auto-targeting.
+    public IReadOnlyList<Enemy> ActiveEnemies
     {
-        get { return activeEnemies; }
+        get
+        {
+            PruneInactiveEnemies();
+            return activeEnemies;
+        }
     }
 
     // Begins spawning waves and listens for enemy defeats. Design pattern: Observer subscription.
@@ -60,6 +65,13 @@ public sealed class WaveSpawner : MonoBehaviour
             Debug.LogError("WaveSpawner requires a player reference or an active PlayerController.", this);
             enabled = false;
             return;
+        }
+
+        // Include enemies placed directly in the scene, not only ones created by this spawner.
+        Enemy[] existingEnemies = FindObjectsByType<Enemy>();
+        for (int i = 0; i < existingEnemies.Length; i++)
+        {
+            RegisterEnemy(existingEnemies[i]);
         }
 
         StartCoroutine(SpawnWaves());
@@ -108,13 +120,32 @@ public sealed class WaveSpawner : MonoBehaviour
         Enemy enemy = enemyFactory.Create(type, spawnPosition);
         if (enemy != null)
         {
-            activeEnemies.Register(enemy);
+            RegisterEnemy(enemy);
         }
     }
 
-    // Removes defeated enemies from the active registry. Design pattern: Observer event handler.
+    private void RegisterEnemy(Enemy enemy)
+    {
+        if (enemy != null && !activeEnemies.Contains(enemy))
+        {
+            activeEnemies.Add(enemy);
+        }
+    }
+
+    // Removes defeated enemies from the active list.
     private void UnregisterEnemy(Enemy enemy)
     {
-        activeEnemies.Unregister(enemy);
+        activeEnemies.Remove(enemy);
+    }
+
+    private void PruneInactiveEnemies()
+    {
+        for (int i = activeEnemies.Count - 1; i >= 0; i--)
+        {
+            if (activeEnemies[i] == null || activeEnemies[i].IsDead)
+            {
+                activeEnemies.RemoveAt(i);
+            }
+        }
     }
 }
