@@ -2,11 +2,10 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 
 /// <summary>
-/// Fires automatically at the nearest enemy and continuously toward the mouse. Algorithm: squared-distance nearest-target search in O(n) time and O(1) extra space.
+/// Fires automatically at the nearest enemy and continuously toward the mouse. Algorithm: squared-distance nearest-target search in O(n) time and space.
 /// </summary>
 public sealed class AutoWeapon : MonoBehaviour
 {
-    [SerializeField] private WaveSpawner waveSpawner;
     [SerializeField] private Projectile projectilePrefab;
     [SerializeField] private Transform firePoint;
     [SerializeField] private Transform aimPivot;
@@ -26,11 +25,6 @@ public sealed class AutoWeapon : MonoBehaviour
             aimCamera = Camera.main;
         }
 
-        if (waveSpawner == null)
-        {
-            Debug.LogError("AutoWeapon requires a WaveSpawner reference.", this);
-        }
-
         if (projectilePrefab == null)
         {
             Debug.LogError("AutoWeapon requires a projectile prefab.", this);
@@ -38,7 +32,7 @@ public sealed class AutoWeapon : MonoBehaviour
 
         if (aimCamera == null)
         {
-            Debug.LogError("AutoWeapon requires a camera reference or a camera tagged MainCamera.", this);
+            Debug.LogWarning("AutoWeapon has no camera; continuous shots will use the weapon's facing direction.", this);
         }
     }
 
@@ -49,6 +43,13 @@ public sealed class AutoWeapon : MonoBehaviour
             return;
         }
 
+        FireContinuousBullets();
+        FireAtNearestEnemy();
+    }
+
+    private void FireContinuousBullets()
+    {
+        Vector2 origin = firePoint != null ? (Vector2)firePoint.position : (Vector2)transform.position;
         bool hasMouseAim = TryGetMouseWorldPosition(out Vector2 mouseWorldPosition);
         if (hasMouseAim && aimPivot != null)
         {
@@ -60,28 +61,37 @@ public sealed class AutoWeapon : MonoBehaviour
             }
         }
 
-        Vector2 origin = firePoint != null ? (Vector2)firePoint.position : (Vector2)transform.position;
-        if (hasMouseAim)
+        Vector2 direction = hasMouseAim
+            ? mouseWorldPosition - origin
+            : aimPivot != null ? (Vector2)aimPivot.right : (Vector2)transform.right;
+        if (direction.sqrMagnitude <= 0.0001f)
         {
-            Vector2 mouseDirection = mouseWorldPosition - origin;
-            if (mouseDirection.sqrMagnitude > 0.0001f && Time.time >= nextMouseShotTime)
-            {
-                Shoot(origin, mouseDirection);
-                nextMouseShotTime = Time.time + 1f / Mathf.Max(0.1f, mouseShotsPerSecond);
-            }
+            direction = Vector2.right;
         }
 
-        if (waveSpawner == null || Time.time < nextTargetShotTime)
+        if (Time.unscaledTime < nextMouseShotTime)
         {
             return;
         }
 
-        System.Collections.Generic.IReadOnlyList<Enemy> enemies = waveSpawner.ActiveEnemies;
+        Shoot(origin, direction, true);
+        nextMouseShotTime = Time.unscaledTime + 1f / Mathf.Max(0.1f, mouseShotsPerSecond);
+    }
+
+    private void FireAtNearestEnemy()
+    {
+        if (Time.time < nextTargetShotTime)
+        {
+            return;
+        }
+
+        nextTargetShotTime = Time.time + 1f / Mathf.Max(0.1f, shotsPerSecond);
+        Vector2 origin = firePoint != null ? (Vector2)firePoint.position : (Vector2)transform.position;
+        Enemy[] enemies = FindObjectsByType<Enemy>();
         Enemy nearest = null;
         float nearestDistanceSquared = float.PositiveInfinity;
 
-        // A linear scan finds the closest living enemy without computing square roots.
-        for (int i = 0; i < enemies.Count; i++)
+        for (int i = 0; i < enemies.Length; i++)
         {
             Enemy enemy = enemies[i];
             if (enemy == null || enemy.IsDead)
@@ -104,7 +114,6 @@ public sealed class AutoWeapon : MonoBehaviour
 
         Vector2 direction = (Vector2)nearest.transform.position - origin;
         Shoot(origin, direction);
-        nextTargetShotTime = Time.time + 1f / Mathf.Max(0.1f, shotsPerSecond);
     }
 
     private bool TryGetMouseWorldPosition(out Vector2 mouseWorldPosition)
@@ -126,7 +135,7 @@ public sealed class AutoWeapon : MonoBehaviour
         return true;
     }
 
-    private void Shoot(Vector2 origin, Vector2 direction)
+    private void Shoot(Vector2 origin, Vector2 direction, bool useUnscaledTime = false)
     {
         direction.Normalize();
         float projectileAngle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
@@ -134,6 +143,6 @@ public sealed class AutoWeapon : MonoBehaviour
             projectilePrefab,
             origin,
             Quaternion.Euler(0f, 0f, projectileAngle));
-        projectile.Initialize(direction, damage, transform.root);
+        projectile.Initialize(direction, damage, transform.root, useUnscaledTime);
     }
 }

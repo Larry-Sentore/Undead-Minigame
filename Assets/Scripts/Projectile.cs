@@ -12,20 +12,23 @@ public sealed class Projectile : MonoBehaviour
 
     private Vector2 direction = Vector2.right;
     private Transform owner;
+    private bool useUnscaledTime;
 
     // Sets this projectile's travel direction, damage, and owner. OOP principle: controlled object initialization.
-    public void Initialize(Vector2 travelDirection, float damageAmount, Transform projectileOwner)
+    public void Initialize(Vector2 travelDirection, float damageAmount, Transform projectileOwner, bool useUnscaledTime = false)
     {
         direction = travelDirection.sqrMagnitude > 0f ? travelDirection.normalized : Vector2.right;
         damage = Mathf.Max(0f, damageAmount);
         owner = projectileOwner;
+        this.useUnscaledTime = useUnscaledTime;
     }
 
     // Advances the projectile and removes it when its lifetime expires. Algorithm: constant-velocity movement.
     private void Update()
     {
-        transform.position += (Vector3)(direction * speed * Time.deltaTime);
-        lifetime -= Time.deltaTime;
+        float deltaTime = useUnscaledTime ? Time.unscaledDeltaTime : Time.deltaTime;
+        transform.position += (Vector3)(direction * speed * deltaTime);
+        lifetime -= deltaTime;
         if (lifetime <= 0f)
         {
             Destroy(gameObject);

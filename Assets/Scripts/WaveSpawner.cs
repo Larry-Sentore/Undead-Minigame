@@ -16,7 +16,7 @@ public sealed class WaveSpawner : MonoBehaviour
 
     private readonly List<Enemy> activeEnemies = new List<Enemy>();
 
-    // Gets the living enemies used by auto-targeting.
+    // Gets the living enemies currently tracked by this spawner.
     public IReadOnlyList<Enemy> ActiveEnemies
     {
         get
